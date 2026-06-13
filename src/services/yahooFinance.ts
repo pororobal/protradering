@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 import type { OHLCVBar, ProcessedStock, StockQuote } from "../types/index.js";
 import { calcEMA, isEMARising } from "../indicators/ema.js";
 import { calcRSI } from "../indicators/rsi.js";
@@ -12,14 +12,15 @@ import {
 import { detectVCP } from "../indicators/vcp.js";
 import { checkMinervini } from "../screeners/swing.js";
 
-// @ts-ignore - yahoo-finance2 타입 정의 불완전
-const yf = yahooFinance as any;
+const yahooFinance = new YahooFinance({
+  suppressNotices: ["yahooSurvey"],
+});
 
 export async function fetchUniverse(limit = 120): Promise<string[]> {
   const [actives, gainers, dayGainers] = await Promise.all([
-    yf.screener({ scrIds: "most_actives", count: limit }).catch(() => null),
-    yf.screener({ scrIds: "day_gainers", count: 80 }).catch(() => null),
-    yf.screener({ scrIds: "undervalued_growth_stocks", count: 50 }).catch(() => null),
+    yahooFinance.screener({ scrIds: "most_actives", count: limit }).catch(() => null),
+    yahooFinance.screener({ scrIds: "day_gainers", count: 80 }).catch(() => null),
+    yahooFinance.screener({ scrIds: "undervalued_growth_stocks", count: 50 }).catch(() => null),
   ]);
 
   const symbols = new Set<string>();
@@ -37,13 +38,17 @@ export async function fetchHistorical(symbol: string): Promise<OHLCVBar[]> {
   const start = new Date();
   start.setFullYear(start.getFullYear() - 1);
 
-  const result = await yf.historical(symbol, {
+  // @ts-ignore - v3 타입 정의 불완전
+  const result = await yahooFinance.historical(symbol, {
     period1: start,
     period2: end,
     interval: "1d",
   });
 
-  return result.quotes
+  // @ts-ignore - v3 타입 정의 불완전
+  const quotes = result.quotes || result;
+
+  return quotes
     .filter((r: any) => r.open != null && r.close != null)
     .map((r: any) => ({
       date: r.date,
@@ -58,7 +63,8 @@ export async function fetchHistorical(symbol: string): Promise<OHLCVBar[]> {
 
 export async function fetchQuoteSummary(symbol: string): Promise<Partial<StockQuote>> {
   try {
-    const result = await yf.quoteSummary(symbol, {
+    // @ts-ignore - v3 타입 정의 불완전
+    const result = await yahooFinance.quoteSummary(symbol, {
       modules: ["price", "summaryDetail", "defaultKeyStatistics", "assetProfile"],
     });
     const price = result.price;
@@ -73,14 +79,17 @@ export async function fetchQuoteSummary(symbol: string): Promise<Partial<StockQu
       low: price?.regularMarketDayLow ?? 0,
       previousClose: price?.regularMarketPreviousClose ?? 0,
       volume: price?.regularMarketVolume ?? 0,
+      // @ts-ignore - v3 타입 정의 불완전
       marketCap: price?.marketCap ?? stats?.marketCap ?? 0,
       sharesOutstanding: stats?.sharesOutstanding ?? 0,
+      // @ts-ignore - v3 타입 정의 불완전
       floatShares: stats?.floatShares ?? stats?.sharesOutstanding ?? 0,
       sector: profile?.sector ?? "Unknown",
       industry: profile?.industry ?? "Unknown",
     };
   } catch {
-    const result = await yf.quote(symbol);
+    // @ts-ignore - v3 타입 정의 불완전
+    const result = await yahooFinance.quote(symbol);
     return {
       symbol,
       name: result.longName ?? result.shortName ?? symbol,
