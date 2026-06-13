@@ -12,11 +12,14 @@ import {
 import { detectVCP } from "../indicators/vcp.js";
 import { checkMinervini } from "../screeners/swing.js";
 
+// @ts-ignore - yahoo-finance2 타입 정의 불완전
+const yf = yahooFinance as any;
+
 export async function fetchUniverse(limit = 120): Promise<string[]> {
   const [actives, gainers, dayGainers] = await Promise.all([
-    (yahooFinance as any).screener({ scrIds: "most_actives", count: limit }).catch(() => null),
-    (yahooFinance as any).screener({ scrIds: "day_gainers", count: 80 }).catch(() => null),
-    (yahooFinance as any).screener({ scrIds: "undervalued_growth_stocks", count: 50 }).catch(() => null),
+    yf.screener({ scrIds: "most_actives", count: limit }).catch(() => null),
+    yf.screener({ scrIds: "day_gainers", count: 80 }).catch(() => null),
+    yf.screener({ scrIds: "undervalued_growth_stocks", count: 50 }).catch(() => null),
   ]);
 
   const symbols = new Set<string>();
@@ -34,13 +37,13 @@ export async function fetchHistorical(symbol: string): Promise<OHLCVBar[]> {
   const start = new Date();
   start.setFullYear(start.getFullYear() - 1);
 
-  const rows = await (yahooFinance as any).historical(symbol, {
+  const result = await yf.historical(symbol, {
     period1: start,
     period2: end,
     interval: "1d",
   });
 
-  return rows
+  return result.quotes
     .filter((r: any) => r.open != null && r.close != null)
     .map((r: any) => ({
       date: r.date,
@@ -55,12 +58,12 @@ export async function fetchHistorical(symbol: string): Promise<OHLCVBar[]> {
 
 export async function fetchQuoteSummary(symbol: string): Promise<Partial<StockQuote>> {
   try {
-    const q = await (yahooFinance as any).quoteSummary(symbol, {
+    const result = await yf.quoteSummary(symbol, {
       modules: ["price", "summaryDetail", "defaultKeyStatistics", "assetProfile"],
     });
-    const price = q.price;
-    const stats = q.defaultKeyStatistics;
-    const profile = q.assetProfile;
+    const price = result.price;
+    const stats = result.defaultKeyStatistics;
+    const profile = result.assetProfile;
     return {
       symbol,
       name: price?.longName ?? price?.shortName ?? symbol,
@@ -77,17 +80,17 @@ export async function fetchQuoteSummary(symbol: string): Promise<Partial<StockQu
       industry: profile?.industry ?? "Unknown",
     };
   } catch {
-    const q = await (yahooFinance as any).quote(symbol);
+    const result = await yf.quote(symbol);
     return {
       symbol,
-      name: q.longName ?? q.shortName ?? symbol,
-      price: q.regularMarketPrice ?? 0,
-      open: q.regularMarketOpen ?? 0,
-      high: q.regularMarketDayHigh ?? 0,
-      low: q.regularMarketDayLow ?? 0,
-      previousClose: q.regularMarketPreviousClose ?? 0,
-      volume: q.regularMarketVolume ?? 0,
-      marketCap: q.marketCap ?? 0,
+      name: result.longName ?? result.shortName ?? symbol,
+      price: result.regularMarketPrice ?? 0,
+      open: result.regularMarketOpen ?? 0,
+      high: result.regularMarketDayHigh ?? 0,
+      low: result.regularMarketDayLow ?? 0,
+      previousClose: result.regularMarketPreviousClose ?? 0,
+      volume: result.regularMarketVolume ?? 0,
+      marketCap: result.marketCap ?? 0,
       sharesOutstanding: 0,
       floatShares: 0,
       sector: "Unknown",
