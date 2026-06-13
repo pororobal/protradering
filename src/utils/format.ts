@@ -1,44 +1,21 @@
-export function formatPrice(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `$${n.toFixed(2)}`;
-}
+const fmt = (n: number | null | undefined, d = 2): string => n == null || Number.isNaN(n) ? "—" : n.toFixed(d);
 
-export function formatPct(n: number | null | undefined, digits = 2): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  const sign = n > 0 ? "+" : "";
-  return `${sign}${n.toFixed(digits)}%`;
-}
+export const formatPrice = (n: number | null | undefined): string => `$${fmt(n)}`;
+export const formatPct = (n: number | null | undefined, d = 2): string => `${n != null && n > 0 ? "+" : ""}${fmt(n, d)}%`;
 
-export function formatCompact(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
-}
-
-export function formatVolume(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+const formatScale = (n: number, units: [number, string][]): string => {
+  for (const [threshold, suffix] of units) if (n >= threshold) return `${(n / threshold).toFixed(suffix === "K" ? 0 : 2)}${suffix}`;
   return n.toFixed(0);
-}
+};
 
-export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString("ko-KR", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+export const formatCompact = (n: number | null | undefined): string =>
+  n == null || Number.isNaN(n) ? "—" : `$${formatScale(n, [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]])}`;
 
-export function clamp(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n));
-}
+export const formatVolume = (n: number | null | undefined): string =>
+  n == null || Number.isNaN(n) ? "—" : formatScale(n, [[1e9, "B"], [1e6, "M"], [1e3, "K"]]);
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
+export const formatTime = (iso: string): string =>
+  new Date(iso).toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+export const clamp = (n: number, min: number, max: number): number => Math.min(max, Math.max(min, n));
+export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));

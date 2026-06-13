@@ -9,22 +9,17 @@ export function useScreener() {
   const [progress, setProgress] = useState("");
 
   const scan = useCallback(async (force = false) => {
-    if (loading) return;
-    if (!force && data?.cached) return;
-
+    if (loading || (!force && data?.cached)) return;
     setLoading(true);
     setError(null);
     setProgress(force ? "강제 재스캔 중..." : "Yahoo Finance 데이터 수집 중...");
-
     try {
-      const result = await fetchScan(force);
-      setData(result);
-      setProgress("");
+      setData(await fetchScan(force));
     } catch (err) {
       setError(err instanceof Error ? err.message : "스캔 실패");
-      setProgress("");
     } finally {
       setLoading(false);
+      setProgress("");
     }
   }, [loading, data]);
 

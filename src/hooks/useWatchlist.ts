@@ -1,31 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import type { WatchlistItem } from "../types";
 import { WATCHLIST_KEY } from "../utils/constants";
+import { useLocalStorage } from "./useLocalStorage";
 
 export function useWatchlist() {
-  const [items, setItems] = useState<WatchlistItem[]>([]);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(WATCHLIST_KEY);
-      if (raw) setItems(JSON.parse(raw));
-    } catch {
-      setItems([]);
-    }
-  }, []);
-
-  const persist = useCallback((next: WatchlistItem[]) => {
-    setItems(next);
-    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(next));
-  }, []);
+  const [items, persist] = useLocalStorage<WatchlistItem[]>(WATCHLIST_KEY, []);
 
   const add = useCallback(
     (symbol: string, name: string, source: WatchlistItem["source"] = "manual") => {
       if (items.some((i) => i.symbol === symbol)) return;
-      persist([
-        ...items,
-        { symbol, name, addedAt: new Date().toISOString(), source },
-      ]);
+      persist([...items, { symbol, name, addedAt: new Date().toISOString(), source }]);
     },
     [items, persist]
   );
