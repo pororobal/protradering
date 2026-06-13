@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#080c10" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="AI 기반 미국 주식 단타·스윙 종목 탐색기. 실시간 Yahoo Finance 데이터로 강세 종목을 자동 스크리닝합니다." />
+  <title>AI 주식 탐색기</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ─── 헤더 ──────────────────────────────────────────────── -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="header-brand">
+          <span class="header-eyebrow">US Stock Scanner</span>
+          <h1 class="header-title">AI <span>주식</span> 탐색기</h1>
+        </div>
+        <div class="header-status">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="headerStatus">대기중</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── 스캔 버튼 ─────────────────────────────────────────── -->
+    <section class="scan-section">
+      <button class="scan-btn" id="scanBtn">
+        <span class="scan-btn-icon" id="scanBtnIcon">⚡</span>
+        <span id="scanBtnText">종목 스캔 시작</span>
+      </button>
+      <div class="scan-meta">
+        <span class="scan-last-time" id="lastTime">아직 스캔하지 않았습니다</span>
+        <span class="scan-count" id="scanCount"></span>
+      </div>
+    </section>
+
+    <!-- ─── 진행률 ─────────────────────────────────────────────── -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span id="progressLabel">초기화 중...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <!-- ─── 에러 배너 ─────────────────────────────────────────── -->
+    <div class="error-banner" id="errorBanner">
+      <div class="error-banner-title">⚠️ 스캔 오류</div>
+      <p class="error-banner-msg" id="errorMsg">오류가 발생했습니다.</p>
+      <button class="retry-btn" id="retryBtn">다시 시도</button>
+    </div>
+
+    <!-- ─── 통계 배너 ─────────────────────────────────────────── -->
+    <div class="stats-banner" id="statsBanner">
+      <div class="stat-item">
+        <span class="stat-value" id="statsScanned">0</span>
+        <span class="stat-label">스캔</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="statsDay">0</span>
+        <span class="stat-label">단타</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="statsSwing">0</span>
+        <span class="stat-label">스윙</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="statsCommon">0</span>
+        <span class="stat-label">공통</span>
+      </div>
+    </div>
+
+    <!-- ─── 탭 ───────────────────────────────────────────────── -->
+    <div class="tabs">
+      <div class="tab-list" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="daytrade" aria-selected="true">
+          <span class="tab-icon">📊</span>
+          단타
+          <span class="tab-badge" id="dayBadge">0</span>
+        </button>
+        <button class="tab-btn" role="tab" data-tab="swing" aria-selected="false">
+          <span class="tab-icon">📈</span>
+          스윙
+          <span class="tab-badge" id="swingBadge">0</span>
+        </button>
+        <button class="tab-btn common-tab" role="tab" data-tab="common" aria-selected="false">
+          <span class="tab-icon">🏆</span>
+          공통 TOP
+          <span class="tab-badge" id="commonBadge">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── 단타 탭 ────────────────────────────────────────────── -->
+    <div class="tab-panel active" data-panel="daytrade" role="tabpanel">
+      <div class="section-header">
+        <span class="section-title">단타 TOP 10</span>
+        <span class="section-desc">수 시간 ~ 5거래일</span>
+      </div>
+      <div class="stock-cards" id="dayList">
+        <div class="empty-state">
+          <div class="empty-state-icon">📊</div>
+          <div class="empty-state-title">스캔 전</div>
+          <p class="empty-state-desc">위 버튼을 눌러 현재 시장에서<br>가장 강한 단타 종목을 탐색하세요.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 스윙 탭 ────────────────────────────────────────────── -->
+    <div class="tab-panel" data-panel="swing" role="tabpanel">
+      <div class="section-header">
+        <span class="section-title">스윙 TOP 10</span>
+        <span class="section-desc">3일 ~ 30일</span>
+      </div>
+      <div class="stock-cards" id="swingList">
+        <div class="empty-state">
+          <div class="empty-state-icon">📈</div>
+          <div class="empty-state-title">스캔 전</div>
+          <p class="empty-state-desc">위 버튼을 눌러 현재 시장에서<br>가장 강한 스윙 종목을 탐색하세요.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 공통 TOP 탭 ───────────────────────────────────────── -->
+    <div class="tab-panel" data-panel="common" role="tabpanel">
+      <div class="common-hero">
+        <div class="common-hero-title">
+          <span class="trophy">🏆</span>
+          <h2>공통 강세 종목</h2>
+        </div>
+        <p class="common-hero-desc">
+          단타 TOP10과 스윙 TOP10 양쪽에 동시 포함된 종목입니다.
+          단타와 스윙 모두에서 강세를 보이는 최강 종목입니다.
+        </p>
+      </div>
+      <div class="section-header">
+        <span class="section-title gold">공통 강세 TOP 5</span>
+        <span class="section-desc">최우선 관심 종목</span>
+      </div>
+      <div class="stock-cards" id="commonList">
+        <div class="empty-state">
+          <div class="empty-state-icon">🏆</div>
+          <div class="empty-state-title">스캔 전</div>
+          <p class="empty-state-desc">스캔 후 단타·스윙에 동시<br>포함된 공통 종목이 표시됩니다.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#app -->
+
+  <!-- ─── 모달 ──────────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true">
+    <div class="modal" id="modal">
+      <div class="modal-handle"></div>
+
+      <div class="modal-header" style="position:relative;">
+        <div class="modal-header-left">
+          <span class="modal-ticker" id="modalTicker">—</span>
+          <span class="modal-company" id="modalCompany">—</span>
+        </div>
+        <div class="modal-header-right">
+          <span class="modal-price" id="modalPrice">—</span>
+          <span class="card-change flat" id="modalChange">—</span>
+        </div>
+        <button class="modal-close" id="modalClose" aria-label="닫기">✕</button>
+      </div>
+
+      <div class="modal-body" id="modalBody">
+        <!-- JS로 동적 생성 -->
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

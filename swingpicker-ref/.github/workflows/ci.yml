@@ -1,0 +1,171 @@
+# .github/workflows/ci.yml
+# ═══════════════════════════════════════════════
+# SwingPicker CI — Push/PR 마다 자동 실행
+#
+# 체크 항목:
+#   1. Layer / Cycle 검사 (check_deps.py v2) — Hard Fail
+#   2. Silent Exception 검사 (check_silent_exceptions.py v2 — AST + baseline) — Hard Fail
+#   3. [v20.8] Contract Gate (Policy SSOT + Feature Contract) — Hard Fail
+#   4. Python Syntax 검사 — Hard Fail
+#   5. 정책 일관성 + 체결 엔진 + Auth 마이그레이션 + Route 계약 — Hard Fail
+#   6. ML 테스트는 torch 존재 시에만 실행
+#
+# [v22.2] 변경:
+#   · pip install 버전 spec quote 처리 (>가 redirection으로 해석되는 것 방지)
+#   · backup_*, .venv, data/ 검사 대상에서 명시적 제외
+# ═══════════════════════════════════════════════
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'data/**'
+      - '**.md'
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────
+  #  Job 1: 빠른 검사 (의존성 설치 없이)
+  # ─────────────────────────────────────────
+  quick-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 1) 레이어 + 순환참조 검사 (Hard Fail)
+      - name: 🔍 Layer & Import Cycle 검사
+        run: python scripts/check_deps.py
+
+      # 2) Silent Exception 검사 (AST + Baseline — Hard Fail)
+      - name: 🔇 Silent Exception 검출 (AST)
+        run: python scripts/check_silent_exceptions.py
+
+      # 3) [v20.8] 계약 위반 탐지 게이트 (Hard Fail)
+      - name: 📋 Contract Gate (Policy SSOT + Feature Contract)
+        run: python check_contract_gate.py
+
+      # 4) 모든 .py 파일 구문 체크 (Hard Fail, backup/data 제외)
+      - name: 🐍 Python Syntax 검사
+        run: |
+          python -m py_compile main.py
+          find . -name "*.py" \
+            -not -path "./__pycache__/*" \
+            -not -path "./.git/*" \
+            -not -path "./backup_*/*" \
+            -not -path "./legacy_*/*" \
+            -not -path "./.venv/*" \
+            -not -path "./venv/*" \
+            -not -path "./data/*" \
+            -not -name "test_*.py" \
+            -not -path "./tests/*" \
+            -print0 \
+          | xargs -0 -n1 python -m py_compile
+
+  # ─────────────────────────────────────────
+  #  Job 2: 테스트 (의존성 설치 필요)
+  # ─────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    needs: quick-checks
+
+    env:
+      PYTHONUNBUFFERED: '1'
+      BCRYPT_COST: '4'
+      STORAGE_SECRET: 'ci-test-secret-key-12345'
+      LOG_TO_FILE: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 의존성 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements_nicegui.txt') }}
+          restore-keys: pip-
+
+      - name: 📦 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements_nicegui.txt
+          # 버전 spec은 반드시 quote — `>`가 쉘 redirection으로 해석되는 것 방지
+          python -m pip install "bcrypt>=4.0.0" pytest
+
+      # ─── [v24.1.1] Contract Gate 전체 검증 (Hard Fail) ───
+      # quick-checks(의존성 없음)에서는 pandas 필요한 step 10~13이 스킵되므로,
+      # 의존성이 설치된 이 job에서 13단계 전체를 강제한다.
+      - name: 📋 Contract Gate (전체 13단계 — 런타임 행동 계약 포함)
+        run: python check_contract_gate.py
+
+      # ─── 항상 실행되어야 하는 핵심 테스트 (Hard Fail) ───
+      - name: 🧪 Route 계약 테스트
+        run: python -m pytest test_route_contract_v22.py -v --tb=short
+
+      - name: 🧪 정책 일관성 테스트
+        run: python -m pytest test_policy_consistency.py -v --tb=short
+
+      - name: 🧪 체결 엔진(trade_plan) 테스트
+        run: python -m pytest test_trade_plan.py -v --tb=short
+
+      - name: 🧪 Auth 마이그레이션 테스트
+        run: |
+          # 경로 방어: tests/ 또는 루트, 둘 중 어디 있어도 동작
+          if [ -f "tests/test_auth_migration.py" ]; then
+            python -m pytest tests/test_auth_migration.py -v --tb=short
+          elif [ -f "test_auth_migration.py" ]; then
+            python -m pytest test_auth_migration.py -v --tb=short
+          else
+            echo "::error::tests/test_auth_migration.py 또는 test_auth_migration.py 둘 다 없음"
+            echo "::error::Auth 마이그레이션 테스트는 보안 회귀 차단의 핵심입니다."
+            echo "::error::해결: tests/ 디렉터리에 파일 추가 또는 CI에서 이 단계 제거"
+            exit 1
+          fi
+
+      - name: 🧪 Auth 서비스 통합 테스트
+        run: |
+          # 실제 services.auth.authenticate_user / compute_access_status 직접 호출
+          if [ -f "tests/test_auth_service.py" ]; then
+            python -m pytest tests/test_auth_service.py -v --tb=short
+          else
+            echo "::error::tests/test_auth_service.py 없음 - services.auth 회귀 차단 누락"
+            exit 1
+          fi
+
+      - name: 🧪 [Phase 3+4] 추천 결과 한글 키 계약 테스트
+        run: |
+          # recommend_latest.csv가 의존하는 한글 키 (추천매수가/손절가/추천매도가1/2/3)
+          # + ENTRY_ACTION/POSITION_PCT/EXEC_RULE_ID 메타 계약 검증
+          # ticker_analyzer.assemble_result가 만드는 dict 형태 회귀 차단
+          if [ -f "tests/test_recommend_contract.py" ]; then
+            python -m pytest tests/test_recommend_contract.py -v --tb=short
+          else
+            echo "::error::tests/test_recommend_contract.py 없음 - 추천 스키마 회귀 차단 누락"
+            exit 1
+          fi
+
+      # ─── 환경 의존 테스트 (조건부 — 명시적 스킵) ───
+      - name: 🧪 ML 엔진 테스트 (torch 있는 경우만)
+        run: |
+          if python -c "import torch" 2>/dev/null; then
+            python -m pytest test_ml_engine.py -v --tb=short
+          else
+            echo "::notice::torch 미설치 환경 — ML 테스트 건너뜀 (의도된 환경 차이)"
+          fi
+
+      - name: 📊 테스트 결과 요약
+        if: always()
+        run: echo "✅ CI 완료 — $(date +'%Y-%m-%d %H:%M KST')"

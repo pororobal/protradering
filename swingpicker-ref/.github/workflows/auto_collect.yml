@@ -1,0 +1,153 @@
+# .github/workflows/auto_collect.yml
+name: Auto Collect and Push CSV
+
+on:
+  schedule:
+    # 평일 20:05 KST (UTC 11:05) — KRX API 야간 차단 회피
+    - cron: "5 11 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write     # CSV 커밋/푸시 권한 부여
+
+concurrency:
+  group: auto-collect-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      PYTHONUNBUFFERED: "1"
+      TZ: Asia/Seoul
+      TG_TOKEN:          ${{ secrets.TG_TOKEN }}
+      TG_ID:             ${{ secrets.TG_ID }}
+      GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+      DART_API_KEY:      ${{ secrets.DART_API_KEY }}
+      LDY_GIST_ID:      ${{ secrets.LDY_GIST_ID }}
+      LDY_GIST_TOKEN:   ${{ secrets.LDY_GIST_TOKEN }}
+      LDY_GIST_SUBS_ID: ${{ secrets.LDY_GIST_SUBS_ID }}
+      LDY_GIST_INQ_ID:  ${{ secrets.LDY_GIST_INQ_ID }}
+      LDY_KEY_PRO:       ${{ secrets.LDY_KEY_PRO }}
+      LDY_KEY_PRIME:     ${{ secrets.LDY_KEY_PRIME }}
+      LDY_ADMIN_KEY:     ${{ secrets.LDY_ADMIN_KEY }}
+      MASTER_ADMIN_PW:   ${{ secrets.MASTER_ADMIN_PW }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          python -V
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -c "import pykrx, pandas; print('pykrx', pykrx.__version__); print('pandas', pandas.__version__)"
+
+      - name: Debug Secrets (길이만 확인 — 값 노출 없음)
+        run: |
+          echo "TG_TOKEN        length: ${#TG_TOKEN}"
+          echo "TG_ID           length: ${#TG_ID}"
+          echo "GEMINI_API_KEY  length: ${#GEMINI_API_KEY}"
+          echo "DART_API_KEY    length: ${#DART_API_KEY}"
+          echo "LDY_GIST_ID    length: ${#LDY_GIST_ID}"
+          echo "LDY_GIST_TOKEN length: ${#LDY_GIST_TOKEN}"
+          echo "LDY_GIST_SUBS_ID length: ${#LDY_GIST_SUBS_ID}"
+          echo "LDY_GIST_INQ_ID  length: ${#LDY_GIST_INQ_ID}"
+          echo "LDY_KEY_PRO    length: ${#LDY_KEY_PRO}"
+          echo "LDY_KEY_PRIME  length: ${#LDY_KEY_PRIME}"
+          echo "LDY_ADMIN_KEY  length: ${#LDY_ADMIN_KEY}"
+          echo "MASTER_ADMIN_PW length: ${#MASTER_ADMIN_PW}"
+
+      - name: Run Collector
+        run: |
+          echo ">>> Collector 시작: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+          python collector.py
+          echo ">>> Collector 완료: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+
+      # [v3.7.21] 매일 백테스트 검증 자동 재실행
+      # ┌─ 이전엔 수동으로만 돌려서 backtest_validation_latest.json이 정체됨
+      # │  (매일 같은 통계가 Tab 2에 표시됨 — 'wf capital 0/5', '실집행 5건' 고착)
+      # └─ Collector 직후 자동 실행 → 어제 장 마감까지 반영된 최신 통계로 갱신
+      - name: Run Backtest Validation
+        run: |
+          echo ">>> Backtest validation 시작: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+          python backtest_validation.py || {
+            echo "⚠️ backtest_validation 실패 — 기존 JSON 유지하고 계속 진행"
+            exit 0
+          }
+          echo ">>> Backtest validation 완료: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+
+      - name: Run Official Buy Validation
+        run: |
+          echo ">>> Official buy validation 시작: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+          python scripts/official_buy_validation.py --data-dir data --out-dir data || {
+            echo "⚠️ official_buy_validation 실패 — 기존 JSON 유지하고 계속 진행"
+            exit 0
+          }
+          echo ">>> Official buy validation 완료: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+
+      - name: Run No-Buy Breaker Backtest
+        run: |
+          echo ">>> No-buy breaker backtest 시작: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+          python scripts/no_buy_breaker_backtest_v3926.py --data-dir data --out-dir data || {
+            echo "⚠️ no_buy_breaker_backtest 실패 — 기존 breaker 리포트 유지하고 계속 진행"
+            exit 0
+          }
+          echo ">>> No-buy breaker backtest 완료: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+
+      - name: Run Historical RR Alpha Pick
+        run: |
+          echo ">>> Historical RR Alpha Pick 시작: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+          python scripts/find_best_historical_alpha_combo_v22322.py --data-dir data --out-dir data || {
+            echo "⚠️ historical alpha pick 실패 — 기존 리포트 유지하고 계속 진행"
+            exit 0
+          }
+          echo ">>> Historical RR Alpha Pick 완료: $(date +'%Y-%m-%d %H:%M:%S %Z')"
+
+      - name: Show outputs
+        run: |
+          ls -alh data || true
+          head -n 5 data/recommend_latest.csv || true
+          test -f data/official_buy_validation_latest.json && head -n 30 data/official_buy_validation_latest.json || true
+          test -f data/historical_alpha_pick_summary_latest.json && head -n 60 data/historical_alpha_pick_summary_latest.json || true
+          test -f data/historical_alpha_pick_latest.csv && head -n 10 data/historical_alpha_pick_latest.csv || true
+          test -f data/no_buy_breaker_rules_latest.csv && head -n 10 data/no_buy_breaker_rules_latest.csv || true
+
+      - name: Commit & Push CSV
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # .gitignore가 data/*를 막고 있으므로 -f(force)로 우회
+          git add -f data/*.csv data/*.json data/*.pkl data/*.pth || true
+          git add -f data/*.parquet || true
+          git add -f data/*.duckdb || true
+          
+          # data 외 코드 변경도 포함
+          git add -A
+          
+          git diff --staged --quiet || {
+            git commit -m "chore: add CSV $(date +'%Y-%m-%d %H:%M:%S %Z')"
+            
+            # 원격 변경사항 가져오기 (충돌 시 collector 결과물 우선)
+            git fetch origin main
+            git merge origin/main --no-edit -X ours --allow-unrelated-histories || {
+              echo "⚠️ Merge 충돌 → collector 결과물 강제 적용"
+              git checkout --ours -- data/ || true
+              git add -A
+              git commit --no-edit -m "chore: resolve conflict — keep collector output" || true
+            }
+            
+            git push origin main
+          }
+          echo "Done."
