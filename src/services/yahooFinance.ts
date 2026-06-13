@@ -14,9 +14,9 @@ import { checkMinervini } from "../screeners/swing.js";
 
 export async function fetchUniverse(limit = 120): Promise<string[]> {
   const [actives, gainers, dayGainers] = await Promise.all([
-    yahooFinance.screener({ scrIds: "most_actives", count: limit }).catch(() => null),
-    yahooFinance.screener({ scrIds: "day_gainers", count: 80 }).catch(() => null),
-    yahooFinance.screener({ scrIds: "undervalued_growth_stocks", count: 50 }).catch(() => null),
+    (yahooFinance as any).screener({ scrIds: "most_actives", count: limit }).catch(() => null),
+    (yahooFinance as any).screener({ scrIds: "day_gainers", count: 80 }).catch(() => null),
+    (yahooFinance as any).screener({ scrIds: "undervalued_growth_stocks", count: 50 }).catch(() => null),
   ]);
 
   const symbols = new Set<string>();
@@ -34,15 +34,15 @@ export async function fetchHistorical(symbol: string): Promise<OHLCVBar[]> {
   const start = new Date();
   start.setFullYear(start.getFullYear() - 1);
 
-  const rows = await yahooFinance.historical(symbol, {
+  const rows = await (yahooFinance as any).historical(symbol, {
     period1: start,
     period2: end,
     interval: "1d",
   });
 
   return rows
-    .filter((r) => r.open != null && r.close != null)
-    .map((r) => ({
+    .filter((r: any) => r.open != null && r.close != null)
+    .map((r: any) => ({
       date: r.date,
       open: r.open!,
       high: r.high ?? r.close!,
@@ -50,12 +50,12 @@ export async function fetchHistorical(symbol: string): Promise<OHLCVBar[]> {
       close: r.close!,
       volume: r.volume ?? 0,
     }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
 }
 
 export async function fetchQuoteSummary(symbol: string): Promise<Partial<StockQuote>> {
   try {
-    const q = await yahooFinance.quoteSummary(symbol, {
+    const q = await (yahooFinance as any).quoteSummary(symbol, {
       modules: ["price", "summaryDetail", "defaultKeyStatistics", "assetProfile"],
     });
     const price = q.price;
@@ -77,7 +77,7 @@ export async function fetchQuoteSummary(symbol: string): Promise<Partial<StockQu
       industry: profile?.industry ?? "Unknown",
     };
   } catch {
-    const q = await yahooFinance.quote(symbol);
+    const q = await (yahooFinance as any).quote(symbol);
     return {
       symbol,
       name: q.longName ?? q.shortName ?? symbol,
