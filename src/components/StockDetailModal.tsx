@@ -1,3 +1,5 @@
+// src/components/StockDetailModal.tsx (전체 교체용)
+
 import { useEffect, useRef, useState } from "react";
 import type { DayTradeResult, SwingTradeResult } from "../types";
 import { formatPrice, formatPct } from "../utils/format";
@@ -47,7 +49,7 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
             industry: stock.industry,
             tradePlan: stock.tradePlan,
           },
-          analysisType: source, // "day" or "swing"
+          analysisType: source,
         }),
       });
       if (!response.ok) {
@@ -85,13 +87,8 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
             {stock.state && <span className="tag accent">{stock.state}</span>}
           </div>
 
-          {/* 매매 플랜 패널 */}
           {stock.tradePlan && <TradePlanPanel plan={stock.tradePlan} variant="detail" />}
-
-          {/* 점수 세부 내역 */}
           <ScoreBreakdownBar breakdown={stock.breakdown} maxScore={maxScore} />
-
-          {/* 차트 */}
           <TradingViewChart symbol={symbol} />
 
           {/* AI 분석 영역 */}
@@ -107,7 +104,7 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
             {aiLoading && (
               <div className="ai-loading">
                 <div className="spinner"></div>
-                <p>Gemini 모델이 분석하고 있습니다...</p>
+                <p>Gemma 모델이 분석하고 있습니다...</p>
               </div>
             )}
 
@@ -125,7 +122,6 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
             )}
           </div>
 
-          {/* 메모 및 관심종목 */}
           <div className="journal-inline">
             <textarea ref={noteRef} placeholder="트레이딩 메모..." rows={3} />
             <div className="modal-actions">
