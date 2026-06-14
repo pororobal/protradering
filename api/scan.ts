@@ -38,6 +38,8 @@ export default async function handler(req: any, res: any) {
         aiScore: s.aiScore,
         finalScore: s.finalScore,
         state: s.state,
+        // 매수/매도/손절/확률
+        tradePlan: s.tradePlan,
       })),
       swing: result.swing.map((s) => ({
         symbol: s.ticker,
@@ -62,6 +64,8 @@ export default async function handler(req: any, res: any) {
         aiScore: s.aiScore,
         finalScore: s.finalScore,
         state: s.state,
+        // 매수/매도/손절/확률
+        tradePlan: s.tradePlan,
       })),
       marketRegime: null,
       sectorStrength: [],
