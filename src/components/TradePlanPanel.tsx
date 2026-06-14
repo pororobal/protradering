@@ -16,11 +16,17 @@ export function TradePlanPanel({ plan, variant }: Props) {
         </div>
         <div className="tp-row">
           <span className="tp-label">목표</span>
-          <span className="tp-value target">{formatPrice(plan.target1)} <small>({formatPct(plan.target1Pct)})</small></span>
+          <span className="tp-value target">
+            {formatPrice(plan.target1)}
+            <span className="pct"> ({formatPct(plan.target1Pct)})</span>
+          </span>
         </div>
         <div className="tp-row">
           <span className="tp-label">손절</span>
-          <span className="tp-value stop">{formatPrice(plan.stopLoss)} <small>({formatPct(plan.stopLossPct)})</small></span>
+          <span className="tp-value stop">
+            {formatPrice(plan.stopLoss)}
+            <span className="pct"> ({formatPct(plan.stopLossPct)})</span>
+          </span>
         </div>
         <div className="tp-row">
           <span className="tp-label">확률</span>
