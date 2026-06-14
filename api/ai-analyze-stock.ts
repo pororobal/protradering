@@ -130,7 +130,7 @@ ${chartAnalysisText}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openrouter/free",
+        model: "google/gemma-4-31b-it:free",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 1000,
         temperature: 0.7,
