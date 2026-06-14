@@ -32,7 +32,14 @@ export function ScanBar({
         </button>
       </div>
       <div className="scan-meta">
-        {loading && progress && <span className="progress">{progress}</span>}
+        {loading && (
+          <div className="scan-progress">
+            <div className="progress-bar">
+              <div className="progress-fill" />
+            </div>
+            <span className="progress-text">{progress}</span>
+          </div>
+        )}
         {error && <span className="error">{error}</span>}
         {!loading && timestamp && (
           <span>

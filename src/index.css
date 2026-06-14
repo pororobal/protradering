@@ -97,6 +97,41 @@ h1 {
   color: var(--muted);
 }
 
+.scan-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 200px;
+}
+
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #22c55e);
+  width: 100%;
+  animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .ai-btn {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
