@@ -1,10 +1,12 @@
+// src/services/api.ts
+
 import type { ScanResponse } from "../types";
 
 const API_BASE = "/api";
 
 export async function fetchScan(force = false): Promise<ScanResponse> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55초 타임아웃 (Vercel 제한: 60초)
+  const timeoutId = setTimeout(() => controller.abort(), 55000);
 
   try {
     const res = await fetch(`${API_BASE}/scan${force ? "/refresh" : ""}`, {
@@ -28,18 +30,18 @@ export async function fetchScan(force = false): Promise<ScanResponse> {
 }
 
 export const checkHealth = async () => fetch(`${API_BASE}/health`).then((r) => r.ok, () => false);
-// src/services/api.ts - 기존 파일에 추가
 
-// AI 분석 요청
+// AI 분석 요청 (차트 데이터 포함)
 export async function fetchAIAnalysis(
   symbol: string,
   stock: any,
-  analysisType: "day" | "swing"
+  analysisType: "day" | "swing",
+  chartData?: any  // 차트 데이터 추가
 ): Promise<{ analysis: string }> {
   const res = await fetch(`${API_BASE}/ai-analyze-stock`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ symbol, stock, analysisType }),
+    body: JSON.stringify({ symbol, stock, analysisType, chartData }),
   });
 
   if (!res.ok) {
