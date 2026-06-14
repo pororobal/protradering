@@ -68,7 +68,7 @@ export default async function handler(req, res) {
         "X-Title": "ProTradering AI",
       },
       body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
+        model: "openrouter/free",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 800,
         temperature: 0.7,
