@@ -37,6 +37,7 @@ export interface StockResult {
   ebs?: number;
   structScore?: number;
   timingScore?: number;
+  aiScore?: number;
   finalScore?: number;
   state?: string;
 }
@@ -185,6 +186,7 @@ async function processSymbol(
             ebs: dayRes.swingPicker.ebs,
             structScore: dayRes.swingPicker.structScore,
             timingScore: dayRes.swingPicker.timingScore,
+            aiScore: dayRes.swingPicker.aiScore,
             finalScore: dayRes.swingPicker.finalScore,
             state: dayRes.swingPicker.state,
           }
@@ -206,6 +208,7 @@ async function processSymbol(
             ebs: swingRes.swingPicker.ebs,
             structScore: swingRes.swingPicker.structScore,
             timingScore: swingRes.swingPicker.timingScore,
+            aiScore: swingRes.swingPicker.aiScore,
             finalScore: swingRes.swingPicker.finalScore,
             state: swingRes.swingPicker.state,
           }

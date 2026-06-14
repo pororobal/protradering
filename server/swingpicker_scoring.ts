@@ -10,6 +10,7 @@ export interface SwingPickerScores {
   ebs: number;              // EBS 점수 (0-10)
   structScore: number;      // STRUCT_SCORE (0-100)
   timingScore: number;      // TIMING_SCORE (0-100)
+  aiScore: number;          // AI 점수 (0-100)
   finalScore: number;       // FINAL_SCORE (0-100)
   state: string;            // 상태 (ATTACK, ARMED, WAIT, NEUTRAL, OVERHEAT, EXIT_WARNING)
   ebsBreakdown: Record<string, number>;
@@ -263,33 +264,77 @@ export function determineState(ind: Indicators): string {
   return "NEUTRAL";
 }
 
+// ─── AI 점수 (0-100) ─────────────────────────────────────────────────────────────
+
+export function calcAIScore(ind: Indicators): number {
+  // AI 점수는 기존 지표들의 조합으로 시뮬레이션
+  // 실제 ML 모델이 없으므로 규칙 기반으로 계산
+  let score = 0;
+
+  // 모멘텀 점수 (max 30)
+  if (ind.dayChange > 5) score += 30;
+  else if (ind.dayChange > 3) score += 25;
+  else if (ind.dayChange > 1) score += 15;
+  else if (ind.dayChange > 0) score += 8;
+
+  // 트렌드 점수 (max 25)
+  if (ind.ema20 !== null && ind.ema50 !== null && ind.currentPrice > ind.ema20 && ind.ema20 > ind.ema50) {
+    score += 25;
+  } else if (ind.ema20 !== null && ind.currentPrice > ind.ema20) {
+    score += 15;
+  }
+
+  // 거래량 점수 (max 20)
+  if (ind.rvol >= 3) score += 20;
+  else if (ind.rvol >= 2) score += 15;
+  else if (ind.rvol >= 1.5) score += 10;
+
+  // RSI 점수 (max 15)
+  if (ind.rsi !== null) {
+    if (ind.rsi >= 55 && ind.rsi <= 75) score += 15;
+    else if (ind.rsi >= 45 && ind.rsi <= 85) score += 10;
+  }
+
+  // 돌파 점수 (max 10)
+  if (ind.isNearYearHigh) score += 10;
+  else if (ind.breakHigh60) score += 8;
+  else if (ind.breakHigh20) score += 5;
+
+  return Math.min(100, score);
+}
+
 // ─── FINAL_SCORE 계산 ───────────────────────────────────────────────────────────
 
 export function calcFinalScore(
   structScore: number,
   timingScore: number,
+  aiScore: number,
   macroRisk: "NORMAL" | "CAUTION" | "CRITICAL" = "NORMAL"
 ): number {
-  // Dynamic weights based on macro risk
+  // Dynamic weights based on macro risk and AI availability
   let wStruct: number;
   let wTiming: number;
+  let wAI: number;
 
   switch (macroRisk) {
     case "CRITICAL":
-      wStruct = 0.55;
-      wTiming = 0.25;
-      break;
-    case "CAUTION":
       wStruct = 0.50;
       wTiming = 0.30;
+      wAI = 0.20;
+      break;
+    case "CAUTION":
+      wStruct = 0.45;
+      wTiming = 0.35;
+      wAI = 0.20;
       break;
     default: // NORMAL
-      wStruct = 0.40;
-      wTiming = 0.40;
+      wStruct = 0.35;
+      wTiming = 0.35;
+      wAI = 0.30;
       break;
   }
 
-  const finalScore = (structScore * wStruct) + (timingScore * wTiming);
+  const finalScore = (structScore * wStruct) + (timingScore * wTiming) + (aiScore * wAI);
   return Math.max(0, Math.min(100, Math.round(finalScore)));
 }
 
@@ -302,13 +347,15 @@ export function calcSwingPickerScores(
   const ebsResult = calcEBSScore(ind);
   const structResult = calcStructScore(ind);
   const timingResult = calcTimingScore(ind);
+  const aiScore = calcAIScore(ind);
   const state = determineState(ind);
-  const finalScore = calcFinalScore(structResult.score, timingResult.score, macroRisk);
+  const finalScore = calcFinalScore(structResult.score, timingResult.score, aiScore, macroRisk);
 
   return {
     ebs: ebsResult.score,
     structScore: structResult.score,
     timingScore: timingResult.score,
+    aiScore,
     finalScore,
     state,
     ebsBreakdown: ebsResult.breakdown,
