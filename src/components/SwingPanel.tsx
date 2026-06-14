@@ -1,6 +1,7 @@
 import type { SwingTradeResult } from "../types";
 import { formatPrice, formatPct, formatCompact, formatVolume } from "../utils/format";
 import { ScoreBreakdownBar } from "./ScoreBreakdownBar";
+import { TradePlanPanel } from "./TradePlanPanel";
 
 interface Props {
   stocks: SwingTradeResult[];
@@ -47,8 +48,10 @@ export function SwingPanel({ stocks, loading, hasScanned, onSelect, watchlist }:
             <div className="tags">
               {s.minerviniPass && <span className="tag accent">Minervini</span>}
               {s.near52wHigh && <span className="tag">52W High</span>}
+              {s.state && <span className="tag accent">{s.state}</span>}
               <span className="tag">{s.sector}</span>
             </div>
+            {s.tradePlan && <TradePlanPanel plan={s.tradePlan} variant="compact" />}
             <ScoreBreakdownBar breakdown={s.breakdown} maxScore={500} />
             <div className="card-footer">
               <span className="muted">{formatCompact(s.marketCap)} · Vol {formatVolume(s.volume)}</span>

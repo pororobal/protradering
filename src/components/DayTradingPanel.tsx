@@ -1,6 +1,7 @@
 import type { DayTradeResult } from "../types";
 import { formatPrice, formatPct, formatCompact, formatVolume } from "../utils/format";
 import { ScoreBreakdownBar } from "./ScoreBreakdownBar";
+import { TradePlanPanel } from "./TradePlanPanel";
 
 interface Props {
   stocks: DayTradeResult[];
@@ -46,8 +47,10 @@ export function DayTradingPanel({ stocks, loading, hasScanned, onSelect, watchli
             </div>
             <div className="tags">
               {s.gapUp && <span className="tag">Gap</span>}
+              {s.state && <span className="tag accent">{s.state}</span>}
               <span className="tag">{s.sector}</span>
             </div>
+            {s.tradePlan && <TradePlanPanel plan={s.tradePlan} variant="compact" />}
             <ScoreBreakdownBar breakdown={s.breakdown} maxScore={300} />
             <div className="card-footer">
               <span className="muted">{formatCompact(s.marketCap)} · Vol {formatVolume(s.volume)}</span>
