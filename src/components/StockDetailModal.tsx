@@ -6,7 +6,7 @@ import { formatPrice, formatPct } from "../utils/format";
 import { TradingViewChart } from "./TradingViewChart";
 import { ScoreBreakdownBar } from "./ScoreBreakdownBar";
 import { TradePlanPanel } from "./TradePlanPanel";
-import { fetchAIAnalysis } from "../services/api";  // 👈 API 함수 import
+import { fetchAIAnalysis } from "../services/api";
 
 interface Props {
   symbol: string;
@@ -21,7 +21,6 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
   const source = "rvol" in stock && "gapUp" in stock ? "day" : "swing";
   const maxScore = "maxScore" in stock ? stock.maxScore : 300;
 
-  // AI 분석 상태
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -35,7 +34,6 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
     setAiLoading(true);
     setAiError(null);
     try {
-      // 👇 api.ts의 fetchAIAnalysis 함수 사용
       const result = await fetchAIAnalysis(symbol, {
         name: stock.name,
         price: stock.price,
@@ -78,51 +76,57 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
           <ScoreBreakdownBar breakdown={stock.breakdown} maxScore={maxScore} />
           <TradingViewChart symbol={symbol} />
 
-          {/* AI 분석 영역 */}
-          <div className="ai-section">
-            <button
-              className="btn primary ai-btn"
-              onClick={handleAIAnalysis}
-              disabled={aiLoading}
-            >
-              {aiLoading ? "🤖 AI 분석 중..." : "🤖 AI 매매 아이디어 보기"}
-            </button>
+          {/* AI 분석 결과 영역 (버튼 누르면 아래에 표시) */}
+          {aiLoading && (
+            <div className="ai-loading" style={{ padding: "1rem", marginTop: "1rem" }}>
+              <div className="spinner"></div>
+              <p>Gemma 모델이 분석하고 있습니다...</p>
+            </div>
+          )}
 
-            {aiLoading && (
-              <div className="ai-loading">
-                <div className="spinner"></div>
-                <p>Gemma 모델이 분석하고 있습니다...</p>
+          {aiError && (
+            <div className="ai-error" style={{ padding: "1rem", marginTop: "1rem", textAlign: "center" }}>
+              ⚠️ {aiError}
+            </div>
+          )}
+
+          {aiAnalysis && !aiLoading && (
+            <div className="ai-result" style={{ marginTop: "1rem" }}>
+              <h4>📊 AI 종합 분석</h4>
+              <div className="ai-text">{aiAnalysis}</div>
+            </div>
+          )}
+
+          {/* 👇 메모 입력창 (왼쪽) + AI 버튼 (오른쪽) 나란히 배치 */}
+          <div className="journal-ai-row" style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", alignItems: "flex-start" }}>
+            {/* 메모 입력창 (왼쪽, 70% 너비) */}
+            <div className="journal-inline" style={{ flex: 7 }}>
+              <textarea ref={noteRef} placeholder="트레이딩 메모..." rows={3} style={{ width: "100%" }} />
+              <div className="modal-actions" style={{ marginTop: "0.5rem" }}>
+                <button
+                  className="btn tiny"
+                  onClick={() => watchlist.add(symbol, stock.name, source)}
+                >
+                  {watchlist.has(symbol) ? "★ Watchlist" : "☆ Watchlist"}
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={() => journal.save(symbol, noteRef.current?.value ?? "")}
+                >
+                  메모 저장
+                </button>
               </div>
-            )}
+            </div>
 
-            {aiError && (
-              <div className="ai-error">
-                ⚠️ {aiError}
-              </div>
-            )}
-
-            {aiAnalysis && !aiLoading && (
-              <div className="ai-result">
-                <h4>📊 AI 종합 분석</h4>
-                <div className="ai-text">{aiAnalysis}</div>
-              </div>
-            )}
-          </div>
-
-          <div className="journal-inline">
-            <textarea ref={noteRef} placeholder="트레이딩 메모..." rows={3} />
-            <div className="modal-actions">
+            {/* AI 분석 버튼 (오른쪽, 30% 너비) */}
+            <div style={{ flex: 3 }}>
               <button
-                className="btn tiny"
-                onClick={() => watchlist.add(symbol, stock.name, source)}
+                className="btn primary ai-btn"
+                onClick={handleAIAnalysis}
+                disabled={aiLoading}
+                style={{ width: "100%", height: "80px", whiteSpace: "normal", wordBreak: "keep-all" }}
               >
-                {watchlist.has(symbol) ? "★ Watchlist" : "☆ Watchlist"}
-              </button>
-              <button
-                className="btn primary"
-                onClick={() => journal.save(symbol, noteRef.current?.value ?? "")}
-              >
-                메모 저장
+                {aiLoading ? "🤖 분석 중..." : "🤖 AI 매매\n아이디어 보기"}
               </button>
             </div>
           </div>
