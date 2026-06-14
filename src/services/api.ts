@@ -36,7 +36,7 @@ export async function fetchAIAnalysis(
   stock: any,
   analysisType: "day" | "swing"
 ): Promise<{ analysis: string }> {
-  const res = await fetch(`${API_BASE}/api/ai-analyze-stock`, {
+  const res = await fetch(`${API_BASE}/ai-analyze-stock`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ symbol, stock, analysisType }),
