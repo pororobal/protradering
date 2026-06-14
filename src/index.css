@@ -676,3 +676,42 @@ h1 {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+/* ============================================
+   TradePlanPanel 추가/개선 스타일
+   - compact 모드: 퍼센트(%) 색상 구분, 글자 크기 선명
+   - detail 모드: 퍼센트(sub) 크기 증가, 가격과 함께 강조
+   ============================================ */
+
+/* compact 모드: 퍼센트(pct) 스타일 */
+.trade-plan.compact .tp-value .pct {
+  font-size: 0.8rem;      /* small 태그보다 크게 */
+  font-weight: 500;
+  margin-left: 4px;
+}
+.trade-plan.compact .tp-value.target .pct {
+  color: var(--up);       /* 초록색 */
+}
+.trade-plan.compact .tp-value.stop .pct {
+  color: var(--down);     /* 빨간색 */
+}
+
+/* detail 모드: 퍼센트(sub) 크기 및 굵기 개선 */
+.tp-box-sub {
+  font-size: 0.85rem;     /* 기존 0.75rem → 0.85rem */
+  font-weight: 500;
+  margin-top: 0.3rem;
+}
+.tp-box-sub.up {
+  color: var(--up);
+}
+.tp-box-sub.down {
+  color: var(--down);
+}
+
+/* (선택) 가격 숫자도 조금 더 강조 */
+.tp-box-value {
+  font-size: 1.15rem;     /* 기존 1.05rem → 1.15rem */
+}
+.trade-plan.compact .tp-value {
+  font-size: 0.9rem;      /* 기존 0.85rem → 0.9rem */
+}
