@@ -28,3 +28,23 @@ export async function fetchScan(force = false): Promise<ScanResponse> {
 }
 
 export const checkHealth = async () => fetch(`${API_BASE}/health`).then((r) => r.ok, () => false);
+// src/services/api.ts - 기존 파일에 추가
+
+// AI 분석 요청
+export async function fetchAIAnalysis(
+  symbol: string,
+  stock: any,
+  analysisType: "day" | "swing"
+): Promise<{ analysis: string }> {
+  const res = await fetch(`${API_BASE}/ai/analyze-stock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, stock, analysisType }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `AI 분석 실패 (${res.status})`);
+  }
+  return res.json();
+}
