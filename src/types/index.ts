@@ -162,4 +162,4 @@ export interface JournalEntry {
   updatedAt: string;
 }
 
-export type AppTab = "day" | "swing" | "regime" | "sector" | "watchlist" | "journal";
+export type AppTab = "day" | "regime" | "sector" | "watchlist" | "journal";

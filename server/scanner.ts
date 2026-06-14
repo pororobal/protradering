@@ -141,87 +141,6 @@ function calcDayScore(
   return { score: Math.round(score), breakdown: bd };
 }
 
-// ─── 스윙 점수 ───────────────────────────────────────────────────────────────
-
-function calcSwingScore(
-  ind: Indicators,
-  marketCap: number,
-  spyChange3m: number,
-  spyChange6m: number
-): { score: number; breakdown: Record<string, number> } | null {
-  if (ind.currentPrice < 5) return null;
-  if (marketCap < 200_000_000) return null;
-
-  let score = 0;
-  const bd: Record<string, number> = {};
-
-  // 1차: 추세 25점
-  let tr = 0;
-  if (ind.ema20 && ind.ema50 && ind.ema200) {
-    if (ind.ema20 > ind.ema50 && ind.ema50 > ind.ema200) tr += 10;
-    else if (ind.ema20 > ind.ema50) tr += 5;
-    if (ind.currentPrice > ind.ema20) tr += 5;
-    if (ind.currentPrice > ind.ema50) tr += 5;
-    if (ind.currentPrice > ind.ema200) tr += 5;
-  } else if (ind.ema20 && ind.ema50) {
-    if (ind.ema20 > ind.ema50) tr += 12;
-    if (ind.currentPrice > ind.ema20) tr += 7;
-    if (ind.currentPrice > ind.ema50) tr += 6;
-  }
-  tr = Math.min(25, tr);
-  bd.trend = tr;
-  score += tr;
-
-  // 2차: 상대강도 20점
-  let rs = 0;
-  const d3 = ind.change3m - spyChange3m;
-  const d6 = ind.change6m - spyChange6m;
-  if (d3 > 15) rs += 12;
-  else if (d3 > 10) rs += 9;
-  else if (d3 > 5) rs += 6;
-  else if (d3 > 0) rs += 3;
-  if (d6 > 20) rs += 8;
-  else if (d6 > 10) rs += 5;
-  else if (d6 > 0) rs += 2;
-  rs = Math.min(20, rs);
-  bd.relStrength = rs;
-  score += rs;
-
-  // 3차: 신고가 20점
-  let hs = 0;
-  if (ind.high52w > 0) {
-    const pct = ((ind.high52w - ind.currentPrice) / ind.high52w) * 100;
-    if (pct <= 2) hs = 20;
-    else if (pct <= 5) hs = 17;
-    else if (pct <= 10) hs = 13;
-    else if (pct <= 15) hs = 10;
-    else if (ind.breakHigh20) hs = 12;
-  }
-  bd.nearHigh = hs;
-  score += hs;
-
-  // 4차: VCP 15점
-  let vcp = 0;
-  if (ind.vcpAtrDecreasing) vcp += 6;
-  if (ind.vcpRangeDecreasing) vcp += 5;
-  if (ind.vcpVolDecreasing) vcp += 4;
-  vcp = Math.min(15, vcp);
-  bd.vcp = vcp;
-  score += vcp;
-
-  // 5차: 거래량 축적 10점
-  let ac = 0;
-  if (ind.volAccumulation >= 0.65) ac = 10;
-  else if (ind.volAccumulation >= 0.55) ac = 7;
-  else if (ind.volAccumulation >= 0.5) ac = 4;
-  bd.accumulation = ac;
-  score += ac;
-
-  bd.ai = 0; // AI 점수는 analyze 단계에서 채움
-
-  return { score: Math.min(90, Math.round(score)), breakdown: bd };
-}
-
 // ─── 배치 처리 ───────────────────────────────────────────────────────────────
 
 async function sleep(ms: number) {
@@ -295,23 +214,7 @@ async function processSymbol(
           }
         : null;
 
-    // 스윙 점수
-    const swingRes = calcSwingScore(ind, marketCap, spyChange3m, spyChange6m);
-    const swing: StockResult | null =
-      swingRes && swingRes.score >= 60
-        ? {
-            ...base,
-            dayChange: ind.dayChange,
-            change3m: ind.change3m,
-            change6m: ind.change6m,
-            score: swingRes.score,
-            breakdown: swingRes.breakdown,
-            vcpScore: swingRes.breakdown.vcp,
-            type: "swing",
-          }
-        : null;
-
-    return { day, swing };
+    return { day, swing: null };
   } catch (e: any) {
     console.warn(`[scanner] ${symbol} 처리 오류: ${e.message?.slice(0, 60)}`);
     return { day: null, swing: null };
@@ -339,12 +242,11 @@ export async function runScan(): Promise<ScanResult> {
     if (sym && !tickerMap.has(sym)) tickerMap.set(sym, q);
   }
 
-  const tickers = Array.from(tickerMap.keys()).slice(0, 80);
+  const tickers = Array.from(tickerMap.keys()).slice(0, 40); // 40개로 줄여서 속도 향상
   console.log(`[scanner] 후보 종목: ${tickers.length}개`);
 
   // 2. 종목 처리 (배치 5개씩)
   const dayTrades: StockResult[] = [];
-  const swingTrades: StockResult[] = [];
   const BATCH = 5;
 
   for (let i = 0; i < tickers.length; i += BATCH) {
@@ -354,62 +256,23 @@ export async function runScan(): Promise<ScanResult> {
         processSymbol(sym, tickerMap.get(sym), spyChange3m, spyChange6m)
       )
     );
-    for (const { day, swing } of results) {
+    for (const { day } of results) {
       if (day) dayTrades.push(day);
-      if (swing) swingTrades.push(swing);
     }
-    // 배치 사이 딜레이 (Rate Limit 방지)
-    if (i + BATCH < tickers.length) await sleep(300);
+    // 배치 사이 딜레이 (Rate Limit 방지) - 100ms로 줄여서 속도 향상
+    if (i + BATCH < tickers.length) await sleep(100);
   }
 
   // 3. 정렬 및 TOP10
   dayTrades.sort((a, b) => b.score - a.score);
-  swingTrades.sort((a, b) => b.score - a.score);
-  const top10Day   = dayTrades.slice(0, 10);
-  const top10Swing = swingTrades.slice(0, 10);
+  const top10Day = dayTrades.slice(0, 10);
 
-  // 4. 공통 종목
-  const daySet   = new Set(top10Day.map((s) => s.ticker));
-  const swingSet = new Set(top10Swing.map((s) => s.ticker));
-  const common: CommonResult[] = [];
-
-  for (const ticker of daySet) {
-    if (!swingSet.has(ticker)) continue;
-    const d = top10Day.find((s) => s.ticker === ticker)!;
-    const sw = top10Swing.find((s) => s.ticker === ticker)!;
-    common.push({
-      ticker,
-      name: d.name,
-      price: d.price,
-      dayChange: d.dayChange,
-      marketCap: d.marketCap,
-      dayScore: d.score,
-      swingScore: sw.score,
-      combinedScore: Math.round((d.score + sw.score) / 2),
-      dayBreakdown: d.breakdown,
-      swingBreakdown: sw.breakdown,
-      rsi: d.rsi,
-      ema20: d.ema20,
-      ema50: d.ema50,
-      ema200: d.ema200,
-      atr: d.atr,
-      high52w: d.high52w,
-      low52w: d.low52w,
-      rvol: d.rvol,
-      volume: d.volume,
-      type: "common",
-    });
-  }
-  common.sort((a, b) => b.combinedScore - a.combinedScore);
-
-  console.log(
-    `[scanner] 완료 — 단타: ${top10Day.length}, 스윙: ${top10Swing.length}, 공통: ${common.length}`
-  );
+  console.log(`[scanner] 완료 — 단타: ${top10Day.length}`);
 
   return {
     daytrade: top10Day,
-    swing: top10Swing,
-    common: common.slice(0, 5),
+    swing: [],
+    common: [],
     scannedCount: tickers.length,
     spyChange3m,
     spyChange6m,
