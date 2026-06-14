@@ -21,18 +21,7 @@ const NOTICE_OPTS = {
 };
 
 // yahoo-finance2 전역 설정 (한 번만 실행)
-try {
-  yahooFinance.setGlobalConfig({
-    queue: {
-      // 동시 요청 수 제한 (Yahoo Rate Limit 방지)
-      concurrency: 3,
-      // 요청 사이 최소 간격 ms
-      timeout: 10000,
-    },
-  } as any);
-} catch (_) {
-  // 버전에 따라 setGlobalConfig 없을 수 있음 — 무시
-}
+// setGlobalConfig는 최신 버전에서 제거됨 — 대신 각 호출에서 옵션으로 제어
 
 // ─── 재시도 유틸 ─────────────────────────────────────────────────────────────
 

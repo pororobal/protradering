@@ -1,4 +1,4 @@
-import { runFullScan } from "../server/scanner.js";
+import { runScan } from "../server/scanner.js";
 import { getCachedScan } from "../src/services/cache.js";
 
 export default async function handler(req: any, res: any) {
@@ -8,7 +8,7 @@ export default async function handler(req: any, res: any) {
       return res.json(cached);
     }
 
-    const result = await runFullScan();
+    const result = await runScan();
     return res.json(result);
   } catch (err) {
     console.error("Scan error:", err);
