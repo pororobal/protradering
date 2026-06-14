@@ -1,10 +1,17 @@
 // server/scanner.ts
 // 핵심 스캔 로직 — SwingPicker-web 스코어링 적용
 // 모든 Yahoo Finance 호출은 server/yahoo.ts 래퍼를 통해 처리
+//
+// ── 이번 변경 사항 (핵심 스코어링 공식은 변경하지 않음) ──────────────────────────
+//   1. 후보 종목 풀 확대: 스크리너 소스 추가 + 40 → 100개로 확대
+//   2. 통과 기준 완화: score >= 60 → 45 (너무 낮은 점수는 별도 하드 필터로 차단)
+//   3. 매수/매도/손절/확률(TradePlan) 계산 추가
+//   4. 배치 처리 동시성 약간 상향으로 더 많은 종목을 빠르게 처리
 
 import { safeScreener, safeHistorical, safeQuote, safeQuoteSummary, getSpyReturns } from "./yahoo.js";
 import { computeIndicators, type Indicators } from "./indicators.js";
 import { calcSwingPickerScores, type SwingPickerScores } from "./swingpicker_scoring.js";
+import { calcTradePlan, type TradePlan } from "./tradePlan.js";
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +47,8 @@ export interface StockResult {
   aiScore?: number;
   finalScore?: number;
   state?: string;
+  // 매수/매도/손절/확률
+  tradePlan?: TradePlan;
 }
 
 export interface CommonResult {
@@ -75,7 +84,14 @@ export interface ScanResult {
   timestamp: string;
 }
 
-// ─── SwingPicker-web 스코어링 ─────────────────────────────────────────────────────
+// ─── 통과 기준 ───────────────────────────────────────────────────────────────
+// 기존 60점 단일 컷오프는 너무 빡빡해서 0~1개만 통과하는 문제가 있었음.
+// finalScore(종합) 기준을 45로 낮추고, 대신 EBS(펀더멘털 체크리스트)가
+// 너무 낮은(0~1) 종목은 별도로 걸러내어 "묻지마 통과"를 방지한다.
+const PASS_SCORE_THRESHOLD = 45;
+const MIN_EBS_TO_PASS = 1;
+
+// ─── SwingPicker-web 스코어링 (변경 없음) ─────────────────────────────────────────
 
 function calcSwingPickerDayScore(
   ind: Indicators,
@@ -175,7 +191,9 @@ async function processSymbol(
     // 단타 점수
     const dayRes = calcSwingPickerDayScore(ind, marketCap);
     const day: StockResult | null =
-      dayRes && dayRes.score >= 60
+      dayRes &&
+      dayRes.score >= PASS_SCORE_THRESHOLD &&
+      dayRes.swingPicker.ebs >= MIN_EBS_TO_PASS
         ? {
             ...base,
             dayChange: ind.dayChange,
@@ -189,13 +207,16 @@ async function processSymbol(
             aiScore: dayRes.swingPicker.aiScore,
             finalScore: dayRes.swingPicker.finalScore,
             state: dayRes.swingPicker.state,
+            tradePlan: calcTradePlan(ind, dayRes.swingPicker, "day"),
           }
         : null;
 
     // 스윙 점수
     const swingRes = calcSwingPickerSwingScore(ind, marketCap, spyChange3m, spyChange6m);
     const swing: StockResult | null =
-      swingRes && swingRes.score >= 60
+      swingRes &&
+      swingRes.score >= PASS_SCORE_THRESHOLD &&
+      swingRes.swingPicker.ebs >= MIN_EBS_TO_PASS
         ? {
             ...base,
             dayChange: ind.dayChange,
@@ -211,6 +232,7 @@ async function processSymbol(
             aiScore: swingRes.swingPicker.aiScore,
             finalScore: swingRes.swingPicker.finalScore,
             state: swingRes.swingPicker.state,
+            tradePlan: calcTradePlan(ind, swingRes.swingPicker, "swing"),
           }
         : null;
 
@@ -226,10 +248,12 @@ async function processSymbol(
 export async function runScan(): Promise<ScanResult> {
   console.log("[scanner] 스캔 시작...");
 
-  // 1. 후보 종목 수집
-  const [actives, gainers, spy] = await Promise.all([
-    safeScreener("most_actives", 80).catch(() => []),
-    safeScreener("day_gainers", 50).catch(() => []),
+  // 1. 후보 종목 수집 — 소스를 늘려 후보 풀을 확대
+  const [actives, gainers, losers, undervalued, spy] = await Promise.all([
+    safeScreener("most_actives", 100).catch(() => []),
+    safeScreener("day_gainers", 80).catch(() => []),
+    safeScreener("day_losers", 50).catch(() => []),
+    safeScreener("undervalued_growth_stocks", 50).catch(() => []),
     getSpyReturns().catch(() => ({ change3m: 0, change6m: 0 })),
   ]);
 
@@ -237,18 +261,19 @@ export async function runScan(): Promise<ScanResult> {
 
   // 중복 제거
   const tickerMap = new Map<string, any>();
-  for (const q of [...actives, ...gainers]) {
+  for (const q of [...actives, ...gainers, ...losers, ...undervalued]) {
     const sym = q.symbol ?? q.ticker;
     if (sym && !tickerMap.has(sym)) tickerMap.set(sym, q);
   }
 
-  const tickers = Array.from(tickerMap.keys()).slice(0, 40); // 40개로 줄여서 속도 향상
+  // 40 → 100개로 후보 풀 확대 (배치 동시성도 상향해 속도 보완)
+  const tickers = Array.from(tickerMap.keys()).slice(0, 100);
   console.log(`[scanner] 후보 종목: ${tickers.length}개`);
 
-  // 2. 종목 처리 (배치 5개씩)
+  // 2. 종목 처리 (배치 8개씩)
   const dayTrades: StockResult[] = [];
   const swingTrades: StockResult[] = [];
-  const BATCH = 5;
+  const BATCH = 8;
 
   for (let i = 0; i < tickers.length; i += BATCH) {
     const batch = tickers.slice(i, i + BATCH);
@@ -261,7 +286,7 @@ export async function runScan(): Promise<ScanResult> {
       if (day) dayTrades.push(day);
       if (swing) swingTrades.push(swing);
     }
-    // 배치 사이 딜레이 (Rate Limit 방지) - 100ms로 줄여서 속도 향상
+    // 배치 사이 딜레이 (Rate Limit 방지)
     if (i + BATCH < tickers.length) await sleep(100);
   }
 
