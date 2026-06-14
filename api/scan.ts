@@ -1,5 +1,5 @@
 import { runScan } from "../server/scanner.js";
-import { getCachedScan } from "../src/services/cache.ts";
+import { getCachedScan } from "../src/services/cache";
 
 export default async function handler(req: any, res: any) {
   try {
