@@ -31,6 +31,12 @@ export default async function handler(req: any, res: any) {
         gapUp: false,
         marketCap: s.marketCap,
         volume: s.volume,
+        // SwingPicker-web metrics
+        ebs: s.ebs,
+        structScore: s.structScore,
+        timingScore: s.timingScore,
+        finalScore: s.finalScore,
+        state: s.state,
       })),
       swing: result.swing.map((s) => ({
         symbol: s.ticker,
@@ -48,6 +54,12 @@ export default async function handler(req: any, res: any) {
         vcpScore: s.vcpScore || 0,
         marketCap: s.marketCap,
         volume: s.volume,
+        // SwingPicker-web metrics
+        ebs: s.ebs,
+        structScore: s.structScore,
+        timingScore: s.timingScore,
+        finalScore: s.finalScore,
+        state: s.state,
       })),
       marketRegime: null,
       sectorStrength: [],

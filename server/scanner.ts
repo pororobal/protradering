@@ -1,9 +1,10 @@
 // server/scanner.ts
-// 핵심 스캔 로직 — yahoo-finance2 안정화 버전
+// 핵심 스캔 로직 — SwingPicker-web 스코어링 적용
 // 모든 Yahoo Finance 호출은 server/yahoo.ts 래퍼를 통해 처리
 
 import { safeScreener, safeHistorical, safeQuote, safeQuoteSummary, getSpyReturns } from "./yahoo.js";
 import { computeIndicators, type Indicators } from "./indicators.js";
+import { calcSwingPickerScores, type SwingPickerScores } from "./swingpicker_scoring.js";
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,12 @@ export interface StockResult {
   breakdown: Record<string, number>;
   type: "daytrade" | "swing";
   vcpScore?: number;
+  // SwingPicker-web 추가 필드
+  ebs?: number;
+  structScore?: number;
+  timingScore?: number;
+  finalScore?: number;
+  state?: string;
 }
 
 export interface CommonResult {
@@ -67,159 +74,42 @@ export interface ScanResult {
   timestamp: string;
 }
 
-// ─── 단타 점수 ───────────────────────────────────────────────────────────────
+// ─── SwingPicker-web 스코어링 ─────────────────────────────────────────────────────
 
-function calcDayScore(
+function calcSwingPickerDayScore(
   ind: Indicators,
   marketCap: number
-): { score: number; breakdown: Record<string, number> } | null {
+): { score: number; breakdown: Record<string, number>; swingPicker: SwingPickerScores } | null {
   // 유동성 필터
   if (ind.currentPrice < 2) return null;
   if (marketCap < 100_000_000 || marketCap > 20_000_000_000) return null;
   if (ind.avgDollarVolume < 5_000_000) return null;
 
-  let score = 0;
-  const bd: Record<string, number> = {};
+  // SwingPicker-web 스코어링
+  const swingPicker = calcSwingPickerScores(ind, "NORMAL");
 
-  // 2차: 거래량 25점
-  let vs = 0;
-  if (ind.rvol >= 3) vs = 25;
-  else if (ind.rvol >= 2) vs = 20;
-  else if (ind.rvol >= 1.5) vs = 12;
-  const vr = ind.avgVolume20 > 0 ? ind.currentVolume / ind.avgVolume20 : 0;
-  if (vr >= 3) vs = Math.min(25, vs + 5);
-  else if (vr >= 2) vs = Math.min(25, vs + 3);
-  bd.volume = vs;
-  score += vs;
+  // 단타용 점수 계산 (TIMING_SCORE 기반)
+  const score = swingPicker.timingScore;
 
-  // 3차: 모멘텀 20점
-  let ms = 0;
-  if (ind.dayChange >= 5) ms = 20;
-  else if (ind.dayChange >= 3) ms = 15;
-  else if (ind.dayChange >= 1) ms = 8;
-  if (ind.change5d >= 15) ms = Math.min(20, ms + 5);
-  else if (ind.change5d >= 10) ms = Math.min(20, ms + 3);
-  bd.momentum = ms;
-  score += ms;
-
-  // 4차: 돌파 25점
-  let bs = 0;
-  if (ind.isNearYearHigh) bs = 25;
-  else if (ind.breakHigh60) bs = 22;
-  else if (ind.breakHigh20) bs = 18;
-  else if (ind.gapUpSupport) bs = 20;
-  else if (ind.gapUp) bs = 12;
-  bd.breakout = bs;
-  score += bs;
-
-  // 5차: 기술강도 15점
-  let ts = 0;
-  if (ind.rsi !== null) {
-    if (ind.rsi >= 55 && ind.rsi <= 85) ts += 8;
-    else if (ind.rsi > 85) ts += 2;
-    else if (ind.rsi >= 45) ts += 4;
-  }
-  if (ind.macdHist !== null && ind.macdHist > 0) ts += 4;
-  if (ind.ema20 !== null && ind.currentPrice > ind.ema20) ts += 3;
-  ts = Math.min(15, ts);
-  bd.technical = ts;
-  score += ts;
-
-  // 6차: 변동성 15점
-  let vs2 = 0;
-  if (ind.atrIncreasing) vs2 += 10;
-  if (ind.atr !== null && ind.currentPrice > 0) {
-    const atrPct = (ind.atr / ind.currentPrice) * 100;
-    if (atrPct >= 3) vs2 += 5;
-    else if (atrPct >= 2) vs2 += 3;
-    else if (atrPct >= 1) vs2 += 1;
-  }
-  vs2 = Math.min(15, vs2);
-  bd.volatility = vs2;
-  score += vs2;
-
-  return { score: Math.round(score), breakdown: bd };
+  return { score, breakdown: swingPicker.timingBreakdown, swingPicker };
 }
 
-// ─── 스윙 점수 ───────────────────────────────────────────────────────────────
-
-function calcSwingScore(
+function calcSwingPickerSwingScore(
   ind: Indicators,
   marketCap: number,
   spyChange3m: number,
   spyChange6m: number
-): { score: number; breakdown: Record<string, number> } | null {
+): { score: number; breakdown: Record<string, number>; swingPicker: SwingPickerScores } | null {
   if (ind.currentPrice < 5) return null;
   if (marketCap < 200_000_000) return null;
 
-  let score = 0;
-  const bd: Record<string, number> = {};
+  // SwingPicker-web 스코어링
+  const swingPicker = calcSwingPickerScores(ind, "NORMAL");
 
-  // 1차: 추세 25점
-  let tr = 0;
-  if (ind.ema20 && ind.ema50 && ind.ema200) {
-    if (ind.ema20 > ind.ema50 && ind.ema50 > ind.ema200) tr += 10;
-    else if (ind.ema20 > ind.ema50) tr += 5;
-    if (ind.currentPrice > ind.ema20) tr += 5;
-    if (ind.currentPrice > ind.ema50) tr += 5;
-    if (ind.currentPrice > ind.ema200) tr += 5;
-  } else if (ind.ema20 && ind.ema50) {
-    if (ind.ema20 > ind.ema50) tr += 12;
-    if (ind.currentPrice > ind.ema20) tr += 7;
-    if (ind.currentPrice > ind.ema50) tr += 6;
-  }
-  tr = Math.min(25, tr);
-  bd.trend = tr;
-  score += tr;
+  // 스윙용 점수 계산 (STRUCT_SCORE + TIMING_SCORE 조합)
+  const score = Math.round((swingPicker.structScore + swingPicker.timingScore) / 2);
 
-  // 2차: 상대강도 20점
-  let rs = 0;
-  const d3 = ind.change3m - spyChange3m;
-  const d6 = ind.change6m - spyChange6m;
-  if (d3 > 15) rs += 12;
-  else if (d3 > 10) rs += 9;
-  else if (d3 > 5) rs += 6;
-  else if (d3 > 0) rs += 3;
-  if (d6 > 20) rs += 8;
-  else if (d6 > 10) rs += 5;
-  else if (d6 > 0) rs += 2;
-  rs = Math.min(20, rs);
-  bd.relStrength = rs;
-  score += rs;
-
-  // 3차: 신고가 20점
-  let hs = 0;
-  if (ind.high52w > 0) {
-    const pct = ((ind.high52w - ind.currentPrice) / ind.high52w) * 100;
-    if (pct <= 2) hs = 20;
-    else if (pct <= 5) hs = 17;
-    else if (pct <= 10) hs = 13;
-    else if (pct <= 15) hs = 10;
-    else if (ind.breakHigh20) hs = 12;
-  }
-  bd.nearHigh = hs;
-  score += hs;
-
-  // 4차: VCP 15점
-  let vcp = 0;
-  if (ind.vcpAtrDecreasing) vcp += 6;
-  if (ind.vcpRangeDecreasing) vcp += 5;
-  if (ind.vcpVolDecreasing) vcp += 4;
-  vcp = Math.min(15, vcp);
-  bd.vcp = vcp;
-  score += vcp;
-
-  // 5차: 거래량 축적 10점
-  let ac = 0;
-  if (ind.volAccumulation >= 0.65) ac = 10;
-  else if (ind.volAccumulation >= 0.55) ac = 7;
-  else if (ind.volAccumulation >= 0.5) ac = 4;
-  bd.accumulation = ac;
-  score += ac;
-
-  bd.ai = 0; // AI 점수는 analyze 단계에서 채움
-
-  return { score: Math.min(90, Math.round(score)), breakdown: bd };
+  return { score, breakdown: { ...swingPicker.structBreakdown, ...swingPicker.timingBreakdown }, swingPicker };
 }
 
 // ─── 배치 처리 ───────────────────────────────────────────────────────────────
@@ -282,7 +172,7 @@ async function processSymbol(
     };
 
     // 단타 점수
-    const dayRes = calcDayScore(ind, marketCap);
+    const dayRes = calcSwingPickerDayScore(ind, marketCap);
     const day: StockResult | null =
       dayRes && dayRes.score >= 60
         ? {
@@ -292,11 +182,16 @@ async function processSymbol(
             score: dayRes.score,
             breakdown: dayRes.breakdown,
             type: "daytrade",
+            ebs: dayRes.swingPicker.ebs,
+            structScore: dayRes.swingPicker.structScore,
+            timingScore: dayRes.swingPicker.timingScore,
+            finalScore: dayRes.swingPicker.finalScore,
+            state: dayRes.swingPicker.state,
           }
         : null;
 
     // 스윙 점수
-    const swingRes = calcSwingScore(ind, marketCap, spyChange3m, spyChange6m);
+    const swingRes = calcSwingPickerSwingScore(ind, marketCap, spyChange3m, spyChange6m);
     const swing: StockResult | null =
       swingRes && swingRes.score >= 60
         ? {
@@ -306,8 +201,13 @@ async function processSymbol(
             change6m: ind.change6m,
             score: swingRes.score,
             breakdown: swingRes.breakdown,
-            vcpScore: swingRes.breakdown.vcp,
+            vcpScore: swingRes.breakdown.vcp || 0,
             type: "swing",
+            ebs: swingRes.swingPicker.ebs,
+            structScore: swingRes.swingPicker.structScore,
+            timingScore: swingRes.swingPicker.timingScore,
+            finalScore: swingRes.swingPicker.finalScore,
+            state: swingRes.swingPicker.state,
           }
         : null;
 
