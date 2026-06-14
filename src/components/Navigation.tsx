@@ -2,6 +2,7 @@ import type { AppTab } from "../types";
 
 const TABS: { id: AppTab; label: string }[] = [
   { id: "day", label: "Day Trading" },
+  { id: "swing", label: "Swing Trading" },
   { id: "regime", label: "Market Regime" },
   { id: "sector", label: "Sector Strength" },
   { id: "watchlist", label: "Watchlist" },

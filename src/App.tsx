@@ -6,6 +6,7 @@ import { useJournal } from "./hooks/useJournal";
 import { Navigation } from "./components/Navigation";
 import { ScanBar } from "./components/ScanBar";
 import { DayTradingPanel } from "./components/DayTradingPanel";
+import { SwingPanel } from "./components/SwingPanel";
 import { MarketRegimePanel } from "./components/MarketRegimePanel";
 import { SectorStrengthPanel } from "./components/SectorStrengthPanel";
 import { WatchlistPanel } from "./components/WatchlistPanel";
@@ -20,7 +21,9 @@ export default function App() {
   const journal = useJournal();
 
   const selectedStock =
-    data?.dayTrading.find((s) => s.symbol === selectedSymbol) ?? null;
+    data?.dayTrading.find((s) => s.symbol === selectedSymbol) ??
+    data?.swing.find((s) => s.symbol === selectedSymbol) ??
+    null;
 
   return (
     <div className="app">
@@ -47,6 +50,14 @@ export default function App() {
         {tab === "day" && (
           <DayTradingPanel
             stocks={data?.dayTrading ?? []}
+            loading={loading}
+            onSelect={setSelectedSymbol}
+            watchlist={watchlist}
+          />
+        )}
+        {tab === "swing" && (
+          <SwingPanel
+            stocks={data?.swing ?? []}
             loading={loading}
             onSelect={setSelectedSymbol}
             watchlist={watchlist}
