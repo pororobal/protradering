@@ -25,6 +25,8 @@ export default function App() {
     data?.swing.find((s) => s.symbol === selectedSymbol) ??
     null;
 
+  const hasScanned = data !== null && data.timestamp !== undefined;
+
   return (
     <div className="app">
       <header className="header">
@@ -51,6 +53,7 @@ export default function App() {
           <DayTradingPanel
             stocks={data?.dayTrading ?? []}
             loading={loading}
+            hasScanned={hasScanned}
             onSelect={setSelectedSymbol}
             watchlist={watchlist}
           />
@@ -59,6 +62,7 @@ export default function App() {
           <SwingPanel
             stocks={data?.swing ?? []}
             loading={loading}
+            hasScanned={hasScanned}
             onSelect={setSelectedSymbol}
             watchlist={watchlist}
           />

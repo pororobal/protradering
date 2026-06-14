@@ -5,15 +5,19 @@ import { ScoreBreakdownBar } from "./ScoreBreakdownBar";
 interface Props {
   stocks: DayTradeResult[];
   loading: boolean;
+  hasScanned: boolean;
   onSelect: (symbol: string) => void;
   watchlist: { add: (s: string, n: string, src: "day") => void; has: (s: string) => boolean };
 }
 
-export function DayTradingPanel({ stocks, loading, onSelect, watchlist }: Props) {
+export function DayTradingPanel({ stocks, loading, hasScanned, onSelect, watchlist }: Props) {
   if (loading && !stocks.length) {
     return <Empty msg="Day Trading 스크리너 실행 중..." />;
   }
   if (!stocks.length) {
+    if (hasScanned) {
+      return <Empty msg="스캔 완료 - 기준에 부합하는 종목이 없습니다." />;
+    }
     return <Empty msg="스캔 버튼을 눌러 1~3일 알파 후보를 탐색하세요." />;
   }
 

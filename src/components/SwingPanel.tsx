@@ -5,15 +5,19 @@ import { ScoreBreakdownBar } from "./ScoreBreakdownBar";
 interface Props {
   stocks: SwingTradeResult[];
   loading: boolean;
+  hasScanned: boolean;
   onSelect: (symbol: string) => void;
   watchlist: { add: (s: string, n: string, src: "swing") => void; has: (s: string) => boolean };
 }
 
-export function SwingPanel({ stocks, loading, onSelect, watchlist }: Props) {
+export function SwingPanel({ stocks, loading, hasScanned, onSelect, watchlist }: Props) {
   if (loading && !stocks.length) {
     return <div className="empty">Swing 스크리너 실행 중...</div>;
   }
   if (!stocks.length) {
+    if (hasScanned) {
+      return <div className="empty">스캔 완료 - 기준에 부합하는 종목이 없습니다.</div>;
+    }
     return <div className="empty">스캔 버튼을 눌러 2주~3개월 추세 후보를 탐색하세요.</div>;
   }
 
