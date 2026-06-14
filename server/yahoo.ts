@@ -12,7 +12,7 @@ import yahooFinance from "yahoo-finance2";
 
 // ─── YahooFinance 인스턴스 초기화 ─────────────────────────────────────────────
 
-const yahoo = new yahooFinance();
+const yahoo = new yahooFinance({ suppressNotices: ['ripHistorical'] });
 
 // ─── 공통 옵션 ──────────────────────────────────────────────────────────────
 
