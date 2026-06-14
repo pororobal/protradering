@@ -569,3 +569,110 @@ h1 {
     align-items: flex-start;
   }
 }
+
+/* ─── 매매 플랜 (매수/목표/손절/확률) ─────────────────────────────────────── */
+
+.trade-plan.compact {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.tp-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tp-label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tp-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tp-value small {
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.tp-value.entry { color: var(--text); }
+.tp-value.target { color: var(--up); }
+.tp-value.stop { color: var(--down); }
+.tp-value.prob.high { color: var(--up); }
+.tp-value.prob.mid { color: var(--gold); }
+.tp-value.prob.low { color: var(--down); }
+
+.trade-plan.detail {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.tp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.tp-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+}
+
+.tp-box-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.tp-box-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.tp-box-sub {
+  font-size: 0.75rem;
+  margin-top: 0.2rem;
+}
+
+.tp-box.entry .tp-box-value { color: var(--text); }
+.tp-box.target .tp-box-value,
+.tp-box.target2 .tp-box-value { color: var(--up); }
+.tp-box.stop .tp-box-value { color: var(--down); }
+.tp-box.prob .tp-box-value.high { color: var(--up); }
+.tp-box.prob .tp-box-value.mid { color: var(--gold); }
+.tp-box.prob .tp-box-value.low { color: var(--down); }
+
+.tp-disclaimer {
+  margin-top: 0.6rem;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 640px) {
+  .trade-plan.compact {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .tp-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
