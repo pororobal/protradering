@@ -6,8 +6,13 @@
 //   3. cookieRefresh → 10~20분 뒤 쿠키 만료 자동 갱신
 //   4. FailedYahooValidationError → 부분 결과라도 사용
 //   5. suppressNotices → 콘솔 노이즈 제거
+//   6. YahooFinance 인스턴스 초기화 추가
 
 import yahooFinance from "yahoo-finance2";
+
+// ─── YahooFinance 인스턴스 초기화 ─────────────────────────────────────────────
+
+const yahoo = new yahooFinance();
 
 // ─── 공통 옵션 ──────────────────────────────────────────────────────────────
 
@@ -19,9 +24,6 @@ const QUERY_OPTS = {
 const NOTICE_OPTS = {
   suppressNotices: ["yahooSurvey"],
 };
-
-// yahoo-finance2 전역 설정 (한 번만 실행)
-// setGlobalConfig는 최신 버전에서 제거됨 — 대신 각 호출에서 옵션으로 제어
 
 // ─── 재시도 유틸 ─────────────────────────────────────────────────────────────
 
@@ -94,7 +96,7 @@ export async function safeScreener(
   count = 50
 ): Promise<any[]> {
   return withRetry(async () => {
-    const result = await (yahooFinance as any).screener(
+    const result = await (yahoo as any).screener(
       { scrIds: screenerId, count },
       { ...QUERY_OPTS, ...NOTICE_OPTS }
     );
@@ -108,7 +110,7 @@ export async function safeScreener(
 export async function safeQuote(symbol: string): Promise<any | null> {
   return withRetry(async () => {
     try {
-      const result = await (yahooFinance as any).quote(
+      const result = await (yahoo as any).quote(
         symbol,
         {},
         { ...QUERY_OPTS, ...NOTICE_OPTS }
@@ -131,11 +133,12 @@ export async function safeQuote(symbol: string): Promise<any | null> {
  */
 export async function safeHistorical(symbol: string): Promise<any[]> {
   const period1 = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const period2 = new Date(); // 현재 날짜로 설정
   return withRetry(async () => {
     try {
-      const result = await (yahooFinance as any).historical(
+      const result = await (yahoo as any).historical(
         symbol,
-        { period1, interval: "1d" },
+        { period1, period2, interval: "1d" },
         { ...QUERY_OPTS, ...NOTICE_OPTS }
       );
       return Array.isArray(result) ? result : [];
@@ -157,7 +160,7 @@ export async function safeHistorical(symbol: string): Promise<any[]> {
 export async function safeQuoteSummary(symbol: string): Promise<any | null> {
   return withRetry(async () => {
     try {
-      const result = await (yahooFinance as any).quoteSummary(
+      const result = await (yahoo as any).quoteSummary(
         symbol,
         {
           modules: [
