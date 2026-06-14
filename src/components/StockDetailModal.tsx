@@ -16,6 +16,32 @@ interface Props {
   journal: { save: (s: string, note: string) => void; get: (s: string) => { note: string } | undefined };
 }
 
+// 차트 데이터 수집 함수
+const collectChartData = (stock: any) => {
+  const currentPrice = stock.price;
+  
+  return {
+    currentPrice,
+    ma20: stock.ma20 || null,
+    ma50: stock.ma50 || null,
+    ma200: stock.ma200 || null,
+    rsi: stock.rsi14 || stock.rsi || null,
+    macdSignal: stock.macdSignal || null,
+    volume: stock.volume || null,
+    avgVolume: stock.avgVolume20 || stock.avgVolume || null,
+    high52w: stock.high52w || null,
+    low52w: stock.low52w || null,
+    bbUpper: stock.bbUpper || null,
+    bbLower: stock.bbLower || null,
+    bbPosition: stock.bbPosition || null,
+    // 지지/저항 레벨 계산 (간단한 로직)
+    support1: stock.support1 || (currentPrice * 0.95),
+    support2: stock.support2 || (currentPrice * 0.92),
+    resistance1: stock.resistance1 || (currentPrice * 1.05),
+    resistance2: stock.resistance2 || (currentPrice * 1.08),
+  };
+};
+
 export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }: Props) {
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const source = "rvol" in stock && "gapUp" in stock ? "day" : "swing";
@@ -24,6 +50,7 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [lastRequestTime, setLastRequestTime] = useState(0);
 
   useEffect(() => {
     const existing = journal.get(symbol);
@@ -31,9 +58,21 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
   }, [symbol, journal]);
 
   const handleAIAnalysis = async () => {
+    // 30초 간격 제한 (무료 모델 429 방지)
+    const now = Date.now();
+    if (now - lastRequestTime < 30000) {
+      setAiError(`⏱️ 너무 자주 요청했습니다. ${Math.ceil((30000 - (now - lastRequestTime)) / 1000)}초 후 다시 시도해주세요.`);
+      return;
+    }
+    setLastRequestTime(now);
+    
     setAiLoading(true);
     setAiError(null);
+    
     try {
+      // 차트 데이터 수집
+      const chartData = collectChartData(stock);
+      
       const result = await fetchAIAnalysis(symbol, {
         name: stock.name,
         price: stock.price,
@@ -41,7 +80,8 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
         sector: stock.sector,
         industry: stock.industry,
         tradePlan: stock.tradePlan,
-      }, source);
+      }, source, chartData);
+      
       setAiAnalysis(result.analysis);
     } catch (err: any) {
       console.error("AI 분석 오류:", err);
@@ -76,11 +116,12 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
           <ScoreBreakdownBar breakdown={stock.breakdown} maxScore={maxScore} />
           <TradingViewChart symbol={symbol} />
 
-          {/* AI 분석 결과 영역 (버튼 누르면 아래에 표시) */}
+          {/* AI 분석 결과 영역 */}
           {aiLoading && (
             <div className="ai-loading" style={{ padding: "1rem", marginTop: "1rem" }}>
               <div className="spinner"></div>
-              <p>Gemma 모델이 분석하고 있습니다...</p>
+              <p>🤖 AI가 차트를 분석하고 있습니다...</p>
+              <small className="muted">무료 모델 특성상 10-20초 소요될 수 있습니다</small>
             </div>
           )}
 
@@ -92,14 +133,14 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
 
           {aiAnalysis && !aiLoading && (
             <div className="ai-result" style={{ marginTop: "1rem" }}>
-              <h4>📊 AI 종합 분석</h4>
-              <div className="ai-text">{aiAnalysis}</div>
+              <div className="ai-text" style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                {aiAnalysis}
+              </div>
             </div>
           )}
 
-          {/* 👇 메모 입력창 (왼쪽) + AI 버튼 (오른쪽) 나란히 배치 */}
+          {/* 메모 입력창 + AI 버튼 나란히 배치 */}
           <div className="journal-ai-row" style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", alignItems: "flex-start" }}>
-            {/* 메모 입력창 (왼쪽, 70% 너비) */}
             <div className="journal-inline" style={{ flex: 7 }}>
               <textarea ref={noteRef} placeholder="트레이딩 메모..." rows={3} style={{ width: "100%" }} />
               <div className="modal-actions" style={{ marginTop: "0.5rem" }}>
@@ -118,7 +159,6 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
               </div>
             </div>
 
-            {/* AI 분석 버튼 (오른쪽, 30% 너비) */}
             <div style={{ flex: 3 }}>
               <button
                 className="btn primary ai-btn"
@@ -126,7 +166,7 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
                 disabled={aiLoading}
                 style={{ width: "100%", height: "80px", whiteSpace: "normal", wordBreak: "keep-all" }}
               >
-                {aiLoading ? "🤖 분석 중..." : "🤖 AI 매매\n아이디어 보기"}
+                {aiLoading ? "🤖 분석 중..." : "🤖 AI 차트 분석\n매매 아이디어 보기"}
               </button>
             </div>
           </div>
