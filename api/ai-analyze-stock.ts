@@ -1,7 +1,7 @@
 // api/ai/analyze-stock.ts
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+// Vercel 서버리스 함수용 핸들러 (타입 임포트 제거)
 
-// OpenRouter API 호출
+// OpenRouter API 호출 함수
 async function callOpenRouter(prompt: string, apiKey: string) {
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -26,7 +26,7 @@ async function callOpenRouter(prompt: string, apiKey: string) {
   return data.choices?.[0]?.message?.content || "분석 결과를 생성하지 못했습니다.";
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   // CORS 헤더 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -81,9 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 `;
 
     const analysis = await callOpenRouter(prompt, apiKey);
-
-    return res.json({ analysis });
-  } catch (err: any) {
+    return res.status(200).json({ analysis });
+  } catch (err) {
     console.error("[AI] 요청 실패:", err.message);
     return res.status(500).json({ error: err.message || "AI 분석 중 서버 오류 발생" });
   }
