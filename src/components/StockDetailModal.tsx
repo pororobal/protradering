@@ -1,4 +1,4 @@
-// src/components/StockDetailModal.tsx (전체 교체용)
+// src/components/StockDetailModal.tsx
 
 import { useEffect, useRef, useState } from "react";
 import type { DayTradeResult, SwingTradeResult } from "../types";
@@ -6,6 +6,7 @@ import { formatPrice, formatPct } from "../utils/format";
 import { TradingViewChart } from "./TradingViewChart";
 import { ScoreBreakdownBar } from "./ScoreBreakdownBar";
 import { TradePlanPanel } from "./TradePlanPanel";
+import { fetchAIAnalysis } from "../services/api";  // 👈 API 함수 import
 
 interface Props {
   symbol: string;
@@ -14,8 +15,6 @@ interface Props {
   watchlist: { add: (s: string, n: string, src: "day" | "swing") => void; has: (s: string) => boolean };
   journal: { save: (s: string, note: string) => void; get: (s: string) => { note: string } | undefined };
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3001";
 
 export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }: Props) {
   const noteRef = useRef<HTMLTextAreaElement>(null);
@@ -36,28 +35,16 @@ export function StockDetailModal({ symbol, stock, onClose, watchlist, journal }:
     setAiLoading(true);
     setAiError(null);
     try {
-      const response = await fetch(`${API_BASE}/api/ai/analyze-stock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol,
-          stock: {
-            name: stock.name,
-            price: stock.price,
-            score: stock.score,
-            sector: stock.sector,
-            industry: stock.industry,
-            tradePlan: stock.tradePlan,
-          },
-          analysisType: source,
-        }),
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "분석 요청 실패");
-      }
-      const data = await response.json();
-      setAiAnalysis(data.analysis);
+      // 👇 api.ts의 fetchAIAnalysis 함수 사용
+      const result = await fetchAIAnalysis(symbol, {
+        name: stock.name,
+        price: stock.price,
+        score: stock.score,
+        sector: stock.sector,
+        industry: stock.industry,
+        tradePlan: stock.tradePlan,
+      }, source);
+      setAiAnalysis(result.analysis);
     } catch (err: any) {
       console.error("AI 분석 오류:", err);
       setAiError(err.message || "AI 분석 중 오류가 발생했습니다.");
