@@ -62,6 +62,20 @@ export interface ScoreBreakdown {
   [key: string]: number;
 }
 
+// 매수/매도/손절/확률 플랜 (server/tradePlan.ts와 동일한 형태)
+export interface TradePlan {
+  entry: number;
+  entryType: "market" | "pullback";
+  stopLoss: number;
+  stopLossPct: number;
+  target1: number;
+  target1Pct: number;
+  target2: number;
+  target2Pct: number;
+  riskRewardRatio: number;
+  winProbability: number;
+}
+
 export interface DayTradeResult {
   symbol: string;
   name: string;
@@ -81,6 +95,13 @@ export interface DayTradeResult {
   gapUp: boolean;
   marketCap: number;
   volume: number;
+  // SwingPicker-web 메트릭 (옵션)
+  ebs?: number;
+  structScore?: number;
+  timingScore?: number;
+  finalScore?: number;
+  state?: string;
+  tradePlan?: TradePlan;
 }
 
 export interface SwingTradeResult {
@@ -99,6 +120,13 @@ export interface SwingTradeResult {
   vcpScore: number;
   marketCap: number;
   volume: number;
+  // SwingPicker-web 메트릭 (옵션)
+  ebs?: number;
+  structScore?: number;
+  timingScore?: number;
+  finalScore?: number;
+  state?: string;
+  tradePlan?: TradePlan;
 }
 
 export type MarketRegime = "RISK_ON" | "NEUTRAL" | "RISK_OFF";
