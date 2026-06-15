@@ -1,6 +1,6 @@
 // api/ai-analyze-stock.ts
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   // CORS 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -28,19 +28,19 @@ export default async function handler(req, res) {
     }
 
     // 기술적 지표 계산 헬퍼 함수
-    const calcPctDiff = (price, reference) => {
+    const calcPctDiff = (price: number, reference: number) => {
       if (!reference || reference === 0) return 0;
       return ((price - reference) / reference * 100).toFixed(2);
     };
 
-    const getTrend = (price, ma) => {
+    const getTrend = (price: number, ma: number) => {
       if (!ma) return "데이터 없음";
       if (price > ma) return "상승 (가격이 이동평균 위)";
       if (price < ma) return "하락 (가격이 이동평균 아래)";
       return "중립";
     };
 
-    const getRSIStatus = (rsi) => {
+    const getRSIStatus = (rsi: number) => {
       if (!rsi) return "데이터 없음";
       if (rsi >= 70) return "과매수 (70 이상) - 조정 가능성";
       if (rsi <= 30) return "과매도 (30 이하) - 반등 가능성";
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       return "약한 모멘텀 (50 미만)";
     };
 
-    const getVolumeStatus = (volume, avgVolume) => {
+    const getVolumeStatus = (volume: number, avgVolume: number) => {
       if (!volume || !avgVolume) return "데이터 없음";
       const ratio = volume / avgVolume;
       if (ratio >= 2) return `매우 높음 (평균 대비 ${ratio.toFixed(1)}배) - 거래량 급증`;
@@ -146,8 +146,8 @@ ${chartAnalysisText}
     const data = await response.json();
     const analysis = data.choices?.[0]?.message?.content || "분석 결과를 생성하지 못했습니다.";
     return res.status(200).json({ analysis });
-  } catch (err) {
-    console.error("[AI] 요청 실패:", err.message);
-    return res.status(500).json({ error: err.message || "AI 분석 중 서버 오류 발생" });
+  } catch (err: any) {
+    console.error("[AI] 요청 실패:", err?.message || err);
+    return res.status(500).json({ error: err?.message || "AI 분석 중 서버 오류 발생" });
   }
 }
